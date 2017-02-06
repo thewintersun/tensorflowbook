@@ -1,3 +1,4 @@
+#coding=utf-8
 import tensorflow as tf
 
 x = tf.constant(1.0, name="input")
