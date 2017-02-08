@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 
-
 # 构建图
 x = tf.placeholder(tf.float32)
 y = tf.placeholder(tf.float32)
@@ -19,13 +18,13 @@ train_op = optimizer.apply_gradients(grads_and_vars)
 
 #收集值的操作
 tf.summary.scalar("weight", weight)
-tf.summary.scalar("loss", loss[0])
 tf.summary.scalar("biase", biase)
+tf.summary.scalar("loss", loss[0])
 
 merged_summary = tf.summary.merge_all()
 
 summary_writer = tf.summary.FileWriter('./log_graph' )
-
+summary_writer.add_graph(tf.get_default_graph())
 init_op = tf.global_variables_initializer()
 
 with tf.Session() as sess:
