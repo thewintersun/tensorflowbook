@@ -11,7 +11,7 @@ key, value = reader.read(filename_queue)
 record_defaults = [[1.0], [1.0]]
 v1, v2 = tf.decode_csv(
     value, record_defaults=record_defaults)
-v_mul = tf.mul(v1,v2)
+v_mul = tf.multiply(v1,v2)
 
 init_op = tf.global_variables_initializer()
 local_init_op = tf.local_variables_initializer()

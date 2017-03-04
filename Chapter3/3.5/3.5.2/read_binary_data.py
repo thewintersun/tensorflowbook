@@ -11,7 +11,7 @@ key, value = reader.read(filename_queue)
 decode_value = tf.decode_raw(value, tf.float32)
 v1 = decode_value[0]
 v2 = decode_value[1]
-v_mul = tf.mul(v1,v2)
+v_mul = tf.multiply(v1,v2)
 
 init_op = tf.global_variables_initializer()
 local_init_op = tf.local_variables_initializer()

@@ -30,9 +30,9 @@ init_op = tf.global_variables_initializer()
 
 with tf.Session() as sess:
     sess.run(init_op)
-    for i in range(500):
+    for step in range(500):
         train_x = np.random.randn(1)
         train_y = 2 * train_x + np.random.randn(1) * 0.01  + 10
         _, summary = sess.run([train_op, merged_summary], feed_dict={x:train_x, y:train_y})
-        summary_writer.add_summary(summary, i)
+        summary_writer.add_summary(summary, step)
         
