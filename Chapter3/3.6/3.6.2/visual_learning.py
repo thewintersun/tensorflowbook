@@ -7,7 +7,7 @@ x = tf.placeholder(tf.float32)
 y = tf.placeholder(tf.float32)
 weight = tf.get_variable("weight", [], tf.float32, initializer=tf.random_normal_initializer())
 biase  = tf.get_variable("biase", [], tf.float32, initializer=tf.random_normal_initializer())
-pred = tf.add(tf.mul(x, weight, name="mul_op"), biase, name="add_op")
+pred = tf.add(tf.multiply(x, weight, name="mul_op"), biase, name="add_op")
 
 #损失函数
 loss = tf.square(y - pred, name="loss")
