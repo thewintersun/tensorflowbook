@@ -22,7 +22,6 @@ train_op = optimizer.apply_gradients(grads_and_vars)
 #收集值的操作
 tf.summary.histogram("weight", weight)
 tf.summary.histogram("biase", biase)
-#tf.summary.scalar("loss", loss[0])
 
 merged_summary = tf.summary.merge_all()
 
