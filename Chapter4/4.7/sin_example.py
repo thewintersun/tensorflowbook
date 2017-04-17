@@ -13,7 +13,7 @@ def get_train_data():
   '''返回一个训练样本(train_x, train_y), 
     其中train_x是随机的自变量， train_y是train_x的sin函数值
   '''
-  train_x = np.random.uniform(-10.0, 10.0, (1))
+  train_x = np.random.uniform(0.0, 4.0, (1))
   train_y = math.sin(train_x)
   return train_x, train_y
 
@@ -22,7 +22,7 @@ def get_test_data():
   '''返回一个测试数据(test_x, test_y), 
     
   '''
-  test_x = np.random.uniform(-10.0, 10.0, (1))
+  test_x = np.random.uniform(0.0, 4.0, (1))
   test_y = math.sin(test_x)
   return test_x, test_y
   
@@ -82,6 +82,7 @@ def train():
   net_out = inference(x)
   loss = tf.square(net_out - y)
   opt = tf.train.GradientDescentOptimizer(learning_rate)
+  #opt = tf.train.AdamOptimizer(learning_rate)
   train_op = opt.minimize(loss)
   
   init = tf.global_variables_initializer()
@@ -89,7 +90,7 @@ def train():
   with tf.Session() as sess:
     sess.run(init)
     print("start traing....")
-    for i in range(10000000):
+    for i in range(1000000):
       train_x, train_y = get_train_data()
       sess.run(train_op, feed_dict={x: train_x, y: train_y})
       '''
@@ -99,9 +100,9 @@ def train():
       print(m)
 	  '''
 
-      if i % 10 == 0:
+      if i % 1000 == 0:
         test_x, test_y = get_test_data()
-        loss_value = sess.run(loss, feed_dict={x: [test_x], y: test_y})
+        loss_value = sess.run(loss, feed_dict={x: test_x, y: test_y})
         print("step %d test loss is %f" %(i , loss_value))
 
 
