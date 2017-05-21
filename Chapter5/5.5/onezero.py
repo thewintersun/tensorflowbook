@@ -5,10 +5,7 @@ import os
 import cv2
 
 
-def read_img(filepath):
-  for file in os.listdir(data_dir):
-    file_path = os.path.join(data_dir, file)
-    print(file_path)
+
 
 def gen_tfrecord(zero_dir, one_dir, output_tfrecord_file):
   '''
@@ -60,7 +57,7 @@ def gen_tfrecord(zero_dir, one_dir, output_tfrecord_file):
   tf_writer.close()
 
     
-def gen_tfrecord_data(train_data_dir, test_data_dir)
+def gen_tfrecord_data(train_data_dir, test_data_dir):
   '''
   生成训练和测试的tfrecord格式的数据
   '''
@@ -71,6 +68,25 @@ def gen_tfrecord_data(train_data_dir, test_data_dir)
   test_data_zero_dir = os.path.join(test_data_dir, "0")  
   test_data_one_dir = os.path.join(test_data_dir, "1")  
 
+  output_dir = "./tfrecord_data"
+  if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+  train_tfrecord_file = os.path.join(output_dir, "train.tfrecord")
+  test_tfrecord_file = os.path.join(output_dir, "test.tfrecord")
+  
+  gen_tfrecord(train_data_zero_dir, train_data_one_dir, train_tfrecord_file)
+  gen_tfrecord(test_data_zero_dir, test_data_one_dir, test_tfrecord_file)
+  
+def inference():
+  pass
+
+def train():
+  pass
+  
   
 if __name__ == "__main__":
-  read_img("./data/train/1/")
+  if not os.path.exists("./tfrecord_data/train.tfrecord") or 
+    not os.path.exists("./tfrecord_data/test.tfrecord"):
+    gen_tfrecord_data("./data/train", "./data/test/")
+
+  
