@@ -78,54 +78,22 @@ def gen_tfrecord_data(train_data_dir, test_data_dir):
   gen_tfrecord(test_data_zero_dir, test_data_one_dir, test_tfrecord_file)
 
 
-def read_and_decode(filename_queue):
-  reader = tf.TFRecordReader()
-  _, serialized_example = reader.read(filename_queue)
-  features = tf.parse_single_example(
-      serialized_example,
-      features={
-          'height': tf.FixedLenFeature([], tf.int64),
-          'width': tf.FixedLenFeature([], tf.int64),
-          'channels': tf.FixedLenFeature([], tf.int64),
-          'image_data': tf.FixedLenFeature([], tf.string),
-          'label': tf.FixedLenFeature([], tf.int64),
-      })
 
-  image = tf.decode_raw(features['image_data'], tf.uint8)
-  image = tf.reshape(image, [730, 38])
-
-  image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
-
-  label = tf.cast(features['label'], tf.int32)
-
-  return image, label
-
-
-def inputs(filename, batch_size):
-  with tf.name_scope('input'):
-    filename_queue = tf.train.string_input_producer(
-        [filename])
-
-    image, label = read_and_decode(filename_queue)
-
-    images, labels = tf.train.shuffle_batch(
-        [image, label], batch_size=batch_size, num_threads=2,
-        capacity=10 + 3 * batch_size,
-        min_after_dequeue=10)
-
-    return images, labels
-
- 
-def inference():
+def test():
   pass
-
-def train():
-  pass
-  
+  images, labels = inputs("./tfrecord_data/train.tfrecord", 1 )
+  with tf.Session() as sess:
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+    try:
+      while not coord.should_stop():
+        i = sess.run(images)
+        print(i)
+    except tf.errors.OutOfRangeError:
+      pass
+    finally:
+      coord.request_stop()
   
 if __name__ == "__main__":
-  if not os.path.exists("./tfrecord_data/train.tfrecord") or \
-    not os.path.exists("./tfrecord_data/test.tfrecord"):
-    gen_tfrecord_data("./data/train", "./data/test/")
-
-  
+  gen_tfrecord_data("./data/train", "./data/test/")
+  print("generate tfrecord data complete!")
