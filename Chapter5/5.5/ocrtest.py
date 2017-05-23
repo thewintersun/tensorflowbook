@@ -5,77 +5,18 @@ import os
 import cv2
 
 
+def weight_init(shape):
+    return tf.Variable(tf.truncated_normal(shape, stddev=0.1))
 
+def bias_init(shape):
+    return tf.Variable(tf.constant(0.1, shape = shape))
 
-def gen_tfrecord(zero_dir, one_dir, output_tfrecord_file):
-  '''
-  '''
-  tf_writer = tf.python_io.TFRecordWriter(output_tfrecord_file)
+def conv2d(x,w):
+    return tf.nn.conv2d(x,w, strides=[1, 1, 1, 1], padding='VALID')
 
-  #为数字0的数据
-  for file in os.listdir(zero_dir):
-    file_path = os.path.join(zero_dir, file)
-    image_data = cv2.imread(file_path)
-    image_bytes = image_data.tostring()
-    rows = image_data.shape[0]
-    cols = image_data.shape[1]
-    channels = image_data.shape[2]
-    label_data = 0
+def max_pool(x, size):
+    return tf.nn.max_pool(x, ksize=[1,size,size,1], strides = [1,size,size,1], padding='VALID')
 
-    example = tf.train.Example()
-
-    feature = example.features.feature
-    feature['height'].int64_list.value.append(rows)
-    feature['width'].int64_list.value.append(cols)
-    feature['channels'].int64_list.value.append(channels)
-    feature['image_data'].bytes_list.value.append(image_bytes)
-    feature['label'].int64_list.value.append(label_data)
-
-    tf_writer.write(example.SerializeToString())
-  
-  #为数字1的数据
-  for file in os.listdir(one_dir):
-    file_path = os.path.join(one_dir, file)
-    image_data = cv2.imread(file_path)
-    image_bytes = image_data.tostring()
-    rows = image_data.shape[0]
-    cols = image_data.shape[1]
-    channels = image_data.shape[2]
-    label_data = 1
-
-    example = tf.train.Example()
-
-    feature = example.features.feature
-    feature['height'].int64_list.value.append(rows)
-    feature['width'].int64_list.value.append(cols)
-    feature['channels'].int64_list.value.append(channels)
-    feature['image_data'].bytes_list.value.append(image_bytes)
-    feature['label'].int64_list.value.append(label_data)
-
-    tf_writer.write(example.SerializeToString())
-
-  tf_writer.close()
-
-    
-def gen_tfrecord_data(train_data_dir, test_data_dir):
-  '''
-  生成训练和测试的tfrecord格式的数据
-  '''
-  train_data_zero_dir = os.path.join(train_data_dir, "0")  
-  train_data_one_dir = os.path.join(train_data_dir, "1")  
-
-  
-  test_data_zero_dir = os.path.join(test_data_dir, "0")  
-  test_data_one_dir = os.path.join(test_data_dir, "1")  
-
-  output_dir = "./tfrecord_data"
-  if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-  train_tfrecord_file = os.path.join(output_dir, "train.tfrecord")
-  test_tfrecord_file = os.path.join(output_dir, "test.tfrecord")
-  
-  gen_tfrecord(train_data_zero_dir, train_data_one_dir, train_tfrecord_file)
-  gen_tfrecord(test_data_zero_dir, test_data_one_dir, test_tfrecord_file)
 
 
 def read_and_decode(filename_queue):
@@ -116,15 +57,62 @@ def inputs(filename, batch_size):
     return image, label
 
  
-def inference():
+def inference(input_data):
+  '''
+  定义网络结构、向前计算过程
+  '''
   pass
+  w_conv1 = weight_init([20,20,1,16])
+  b_conv1 = weight_init([16])
+
+  h_conv1 = tf.nn.relu(conv2d(x, w_conv1) + b_conv1)
+  h_pool1 = max_pool(h_conv1, 2) #140
+
+  #init layer 2:
+  w_conv2 = weight_init([5,5,16,16])
+  b_conv2 = weight_init([16])
+        
+  h_conv2 = tf.nn.relu(conv2d(h_pool1, w_conv2) + b_conv2)
+  h_pool2 = max_pool(h_conv2, 2) #68
+
+  #init layer 3:
+  w_conv3 = weight_init([5,5,16,16])
+  b_conv3 = weight_init([16])
+       
+  h_conv3 = tf.nn.relu(conv2d(h_pool2, w_conv3) + b_conv3)
+  h_pool3 = max_pool(h_conv3, 2) # 32
+
+  #init layer 4:
+  w_conv4 = weight_init([5,5,16,16])
+  b_conv4 = weight_init([16])
+        
+  h_conv4 = tf.nn.relu(conv2d(h_pool3, w_conv4) + b_conv4)
+  h_pool4 = max_pool(h_conv4, 2)   #14 14 16
+
+  #init fc layer:
+  w_fc1 = weight_init([14*14*16, 1024])
+  b_fc1 = weight_init([1024])
+        
+  h_fc = tf.nn.relu(tf.matmul(tf.reshape(h_pool4,[-1,14*14*16]), w_fc1)  + b_fc1)
+
+  keep_prob = tf.placeholder("float")
+  #h_fc_drop = tf.nn.dropout(h_fc,keep_prob)
+
+  w_fc2 = weight_init([1024, 2])
+  b_fc2 = weight_init([2])
+
+  h_fc2 = tf.matmul(h_fc, w_fc2) + b_fc2
+  y_conv = tf.nn.softmax(h_fc2)
+
+  
 
 def train():
-  pass
+  '''
+  训练过程
+  '''
+  batch_size = 1
+  train_images, train_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
 
-def test():
-  pass
-  images, labels = inputs("./tfrecord_data/train.tfrecord", 1 )
   with tf.Session() as sess:
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -137,9 +125,12 @@ def test():
     finally:
       coord.request_stop()
   
+  
+  pass
+
+  
 if __name__ == "__main__":
   if not os.path.exists("./tfrecord_data/train.tfrecord") or \
     not os.path.exists("./tfrecord_data/test.tfrecord"):
     gen_tfrecord_data("./data/train", "./data/test/")
 
-  test()  
