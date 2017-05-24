@@ -5,14 +5,21 @@ import os
 import cv2
 
 
+FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_float('gpu_memory_fraction', 0.02, 'gpu占用内存比例')
+tf.app.flags.DEFINE_integer('batch_size', 10, 'batch_size大小')
+tf.app.flags.DEFINE_integer('reload_model', 0, '是否reload之前训练好的模型')
+tf.app.flags.DEFINE_string('model_dir', "./model/", '保存模型的文件夹')
+tf.app.flags.DEFINE_string('event_dir', "./event/", '保存event数据的文件夹,给tensorboard展示用')
+
 def weight_init(shape, name):
     return tf.get_variable(name, shape, initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
 
 def bias_init(shape, name):
     return tf.get_variable(name, shape, initializer=tf.constant_initializer(0.0))
 
-def conv2d(x,w):
-    return tf.nn.conv2d(x,w, strides=[1, 1, 1, 1], padding='VALID')
+def conv2d(x,conv_w):
+    return tf.nn.conv2d(x, conv_w, strides=[1, 1, 1, 1], padding='VALID')
 
 def max_pool(x, size):
     return tf.nn.max_pool(x, ksize=[1,size,size,1], strides = [1,size,size,1], padding='VALID')
@@ -35,7 +42,7 @@ def read_and_decode(filename_queue):
   image = tf.decode_raw(features['image_data'], tf.uint8)
   image = tf.reshape(image, [100, 100, 3])
 
-  #image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
+  image = tf.cast(image, tf.float32) * (1. / 255) - 0.5
 
   label = tf.cast(features['label'], tf.int32)
 
@@ -54,7 +61,7 @@ def inputs(filename, batch_size):
         capacity=4,
         min_after_dequeue=2)
 
-    return image, label
+    return images, labels
 
  
 def inference(input_data):
@@ -92,7 +99,7 @@ def inference(input_data):
     w_fc1 = weight_init([8*8*16, 128], 'fc1_w')
     b_fc1 = bias_init([128], 'fc1_b')
         
-    h_fc = tf.nn.relu(tf.matmul(tf.reshape(h_pool4,[-1,8*8*16]), w_fc1)  + b_fc1)
+    h_fc = tf.nn.relu(tf.matmul(tf.reshape(h_pool3,[-1,8*8*16]), w_fc1)  + b_fc1)
 
   #keep_prob = 0.8
   #h_fc_drop = tf.nn.dropout(h_fc,keep_prob)
@@ -109,45 +116,98 @@ def train():
   '''
   训练过程
   '''
-  batch_size = 1
+  global_step = tf.get_variable('global_step', [],
+                                initializer=tf.constant_initializer(0),
+                                trainable=False, dtype=tf.int32)
+
+  batch_size = FLAGS.batch_size
   train_images, train_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
-  test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
+  #test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
+  test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", 10 )
+  
+  train_labels_one_hot = tf.one_hot(train_labels, 2, on_value=1.0, off_value=0.0)
+  test_labels_one_hot = tf.one_hot(test_labels, 2, on_value=1.0, off_value=0.0)
+
+  learning_rate = 0.00001
   with tf.variable_scope("inference") as scope:
     train_y_conv = inference(train_images)
     scope.reuse_variables()
     test_y_conv = inference(test_images)
 
   cross_entropy = tf.reduce_mean(
-      tf.nn.softmax_cross_entropy_with_logits(labels=train_labels, logits=y_conv))
-  train_op = tf.train.AdamOptimizer(1e-4).minimize(cross_entropy)
-  correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(train_labels, 1))
-  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+      tf.nn.softmax_cross_entropy_with_logits(labels=train_labels_one_hot, logits=train_y_conv))
+  optimizer = tf.train.GradientDescentOptimizer(learning_rate)
+  train_op = optimizer.minimize(cross_entropy, global_step=global_step)
+
+  train_correct_prediction = tf.equal(tf.argmax(train_y_conv, 1), tf.argmax(train_labels_one_hot, 1))
+  train_accuracy = tf.reduce_mean(tf.cast(train_correct_prediction, tf.float32))
+
+  test_correct_prediction = tf.equal(tf.argmax(test_y_conv, 1), tf.argmax(test_labels_one_hot, 1))
+  test_accuracy = tf.reduce_mean(tf.cast(test_correct_prediction, tf.float32))
+  
   
   init_op = tf.global_variables_initializer()
   
-  with tf.Session() as sess:
-    sess.run(init_op)
+  saver = tf.train.Saver()
+  tf.summary.scalar('cross_entropy_loss', cross_entropy)
+  tf.summary.scalar('train_acc', train_accuracy)
+  summary_op = tf.summary.merge_all()
+ 
+  gpu_options = tf.GPUOptions(
+    per_process_gpu_memory_fraction=FLAGS.gpu_memory_fraction)
+  config = tf.ConfigProto(gpu_options=gpu_options)
+ 
+  with tf.Session(config=config) as sess:
+    if FLAGS.reload_model == 1:
+      ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
+      saver.restore(sess, ckpt.model_checkpoint_path)
+      save_step = int(ckpt.model_checkpoint_path.split('/')[-1].split('-')[-1])
+      print("reload model from %s, save_step = %d" % (ckpt.model_checkpoint_path, save_step))
+    else:
+      print("Create model with fresh paramters.")
+      sess.run(init_op)
+
+    summary_writer = tf.summary.FileWriter(FLAGS.event_dir, sess.graph)
+
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     try:
       while not coord.should_stop():
-        for i in range(10000):
-          sess.run(train_op)
-          if i % 100 == 0:
-            train_accuracy = sess.run(accuracy)
-            print("step %d training_acc is %.4f" % (i, train_accuracy))
+        _, g_step = sess.run([train_op, global_step])
+        if g_step % 2 == 0:
+          summary_str = sess.run(summary_op)
+          summary_writer.add_summary(summary_str, g_step)
+
+        if g_step % 100 == 0:
+          train_accuracy_value, loss = sess.run([train_accuracy, cross_entropy])
+          print("step %d training_acc is %.2f, loss is %.4f" % (g_step, train_accuracy_value, loss))
+        if g_step % 1000 == 0:
+          test_accuracy_value = sess.run(test_accuracy)
+          print("step %d test_acc is %.2f" % (g_step, test_accuracy_value))
+
+        if g_step % 2000 == 0:
+          #保存一次模型
+          print("save model to %s" % FLAGS.model_dir  + "model.ckpt." + str(g_step) )
+          saver.save(sess, FLAGS.model_dir + "model.ckpt", global_step=global_step)
+
+          if test_accuracy_value == 1:
+            print("training completed!")
+            coord.request_stop()
 
     except tf.errors.OutOfRangeError:
       pass
     finally:
       coord.request_stop()
   
-  
-
 
   
 if __name__ == "__main__":
   if not os.path.exists("./tfrecord_data/train.tfrecord") or \
     not os.path.exists("./tfrecord_data/test.tfrecord"):
     gen_tfrecord_data("./data/train", "./data/test/")
-
+ 
+  os.environ["CUDA_VISIBLE_DEVICES"] = "0" 
+  #test()
+  if not os.path.exists(FLAGS.model_dir):
+    os.makedirs(FLAGS.model_dir)
+  train()
