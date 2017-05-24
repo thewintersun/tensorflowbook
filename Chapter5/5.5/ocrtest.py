@@ -2,7 +2,6 @@
 
 import tensorflow as tf
 import os
-import cv2
 
 
 FLAGS = tf.app.flags.FLAGS
@@ -13,6 +12,9 @@ tf.app.flags.DEFINE_string('model_dir', "./model/", '保存模型的文件夹')
 tf.app.flags.DEFINE_string('event_dir', "./event/", '保存event数据的文件夹,给tensorboard展示用')
 
 def weight_init(shape, name):
+    '''
+    获取某个shape大小的参数
+    '''
     return tf.get_variable(name, shape, initializer=tf.random_normal_initializer(mean=0.0, stddev=0.1))
 
 def bias_init(shape, name):
@@ -52,7 +54,7 @@ def read_and_decode(filename_queue):
 def inputs(filename, batch_size):
   with tf.name_scope('input'):
     filename_queue = tf.train.string_input_producer(
-        [filename])
+        [filename], num_epochs=2000)
 
     image, label = read_and_decode(filename_queue)
 
@@ -122,13 +124,16 @@ def train():
 
   batch_size = FLAGS.batch_size
   train_images, train_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
-  #test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
-  test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", 10 )
+  test_images, test_labels = inputs("./tfrecord_data/train.tfrecord", batch_size )
+  
   
   train_labels_one_hot = tf.one_hot(train_labels, 2, on_value=1.0, off_value=0.0)
   test_labels_one_hot = tf.one_hot(test_labels, 2, on_value=1.0, off_value=0.0)
 
+  #因为任务比较简单，故意把学习率调小了，以拉长训练过程。
   learning_rate = 0.00001
+  
+  
   with tf.variable_scope("inference") as scope:
     train_y_conv = inference(train_images)
     scope.reuse_variables()
@@ -147,6 +152,7 @@ def train():
   
   
   init_op = tf.global_variables_initializer()
+  local_init_op = tf.local_variables_initializer()
   
   saver = tf.train.Saver()
   tf.summary.scalar('cross_entropy_loss', cross_entropy)
@@ -166,6 +172,7 @@ def train():
     else:
       print("Create model with fresh paramters.")
       sess.run(init_op)
+      sess.run(local_init_op)
 
     summary_writer = tf.summary.FileWriter(FLAGS.event_dir, sess.graph)
 
@@ -189,10 +196,6 @@ def train():
           #保存一次模型
           print("save model to %s" % FLAGS.model_dir  + "model.ckpt." + str(g_step) )
           saver.save(sess, FLAGS.model_dir + "model.ckpt", global_step=global_step)
-
-          if test_accuracy_value == 1:
-            print("training completed!")
-            coord.request_stop()
 
     except tf.errors.OutOfRangeError:
       pass
