@@ -58,7 +58,7 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     return indices, values, shape
 
 def get_audio_feature():
-  audio_filename = "LDC93S1.wav"
+  audio_filename = "audio.wav"
   fs, audio = wav.read(audio_filename)
   inputs = mfcc(audio, samplerate=fs)
   # Tranform in 3D array
