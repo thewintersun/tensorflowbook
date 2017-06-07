@@ -15,33 +15,39 @@ except ImportError:
 
 
 
-# Constants
+# 常量
 SPACE_TOKEN = '<space>'
 SPACE_INDEX = 0
 FIRST_INDEX = ord('a') - 1  # 0 is reserved to space
 
-# Some configs
+# mfcc默认提取出来的一帧13个特征
 num_features = 13
-# Accounting the 0th indice +  space + blank label = 28 characters
+# 26个英文字母 + 1个空白 + 1个no label = 28 label个数
 num_classes = ord('z') - ord('a') + 1 + 1 + 1
 
-# Hyper-parameters
+# 迭代次数
 num_epochs = 1000
+# lstm隐藏单元数
 num_hidden = 40
+# 2层lstm网络
 num_layers = 2
+# batch_size设置为1
 batch_size = 1
+# 初始学习率
 initial_learning_rate = 0.01
 
-
+# 样本个数
 num_examples = 1
+# 一个epoch有多少个batch
 num_batches_per_epoch = int(num_examples/batch_size)
 
+
 def sparse_tuple_from(sequences, dtype=np.int32):
-    """Create a sparse representention of x.
+    """得到一个list的稀疏表示，为了直接将数据赋值给tensorflow的tf.sparse_placeholder稀疏矩阵
     Args:
-        sequences: a list of lists of type dtype where each element is a sequence
+        sequences: 序列的列表
     Returns:
-        A tuple with (indices, values, shape)
+        一个三元组，和tensorflow的tf.sparse_placeholder同结构
     """
     indices = []
     values = []
@@ -56,22 +62,34 @@ def sparse_tuple_from(sequences, dtype=np.int32):
 
     return indices, values, shape
 
+
 def get_audio_feature():
+  '''
+  获取wav文件提取mfcc特征之后的数据
+  '''
+  
   audio_filename = "audio.wav"
+  
+  #读取wav文件内容，fs为采样率， audio为数据
   fs, audio = wav.read(audio_filename)
+  
+  #提取mfcc特征
   inputs = mfcc(audio, samplerate=fs)
-  # Tranform in 3D array
+  # 对特征数据进行归一化，减去均值除以方差
   feature_inputs = np.asarray(inputs[np.newaxis, :])
   feature_inputs = (feature_inputs - np.mean(feature_inputs))/np.std(feature_inputs)
+  
+  #特征数据的序列长度
   feature_seq_len = [feature_inputs.shape[1]]
   
   return feature_inputs, feature_seq_len
   
 def get_audio_label():
+  # 对应wav文件内容的文本内容
   target_filename = 'label.txt'
   
   with open(target_filename, 'r') as f:
-    #she had your dark suit in greasy wash water all year
+    #文本的内容是“she had your dark suit in greasy wash water all year”
     line = f.readlines()[0].strip()
     targets = line.replace(' ', '  ')
     #['she', '', 'had', '', 'your', '', 'dark', '', 'suit', '', 'in', '', 'greasy', '', 'wash', '', 'water', '', 'all', '', 'year']
@@ -164,7 +182,6 @@ def main():
   loss = tf.nn.ctc_loss(targets, logits, seq_len)
   cost = tf.reduce_mean(loss)
 
-  #optimizer = tf.train.AdamOptimizer(initial_learning_rate).minimize(cost)
   optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
 
   # Option 2: tf.contrib.ctc.ctc_beam_search_decoder
