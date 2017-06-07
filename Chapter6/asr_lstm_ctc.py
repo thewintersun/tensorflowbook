@@ -26,12 +26,11 @@ num_features = 13
 num_classes = ord('z') - ord('a') + 1 + 1 + 1
 
 # Hyper-parameters
-num_epochs = 200
-num_hidden = 50
-num_layers = 1
+num_epochs = 1000
+num_hidden = 40
+num_layers = 2
 batch_size = 1
-initial_learning_rate = 1e-2
-momentum = 0.9
+initial_learning_rate = 0.01
 
 
 num_examples = 1
@@ -98,19 +97,38 @@ def get_audio_label():
 
 
 def inference(inputs, seq_len):
-  cell = tf.contrib.rnn.LSTMCell(num_hidden, state_is_tuple=True)
+  
+  #采用2层双向LSTM
+  cell_fw = tf.contrib.rnn.LSTMCell(num_hidden, 
+                        initializer=tf.random_normal_initializer(
+                                        mean=0.0, stddev=0.1),
+                        state_is_tuple=True)
+  cells_fw = [cell_fw] * num_layers
+
+  cell_bw = tf.contrib.rnn.LSTMCell(num_hidden, 
+                        initializer=tf.random_normal_initializer(
+                                        mean=0.0, stddev=0.1),
+                        state_is_tuple=True)
+  cells_bw = [cell_bw] * num_layers
+
+  outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(cells_fw,
+                                                                 cells_bw,
+                                                                 inputs,
+                                                               dtype=tf.float32,
+                                                        sequence_length=seq_len)
+
+  '''
   stack = tf.contrib.rnn.MultiRNNCell([cell] * num_layers,
                                         state_is_tuple=True)
   outputs, _ = tf.nn.dynamic_rnn(stack, inputs, seq_len, dtype=tf.float32)
+  '''
+
   shape = tf.shape(inputs)
   batch_s, max_timesteps = shape[0], shape[1]
 
   # Reshaping to apply the same weights over the timesteps
   outputs = tf.reshape(outputs, [-1, num_hidden])
 
-    # Truncated normal with mean 0 and stdev=0.1
-    # Tip: Try another initialization
-    # see https://www.tensorflow.org/versions/r0.9/api_docs/python/contrib.layers.html#initializers
   W = tf.Variable(tf.truncated_normal([num_hidden,
                                          num_classes],
                                         stddev=0.1))
@@ -146,8 +164,8 @@ def main():
   loss = tf.nn.ctc_loss(targets, logits, seq_len)
   cost = tf.reduce_mean(loss)
 
-  optimizer = tf.train.MomentumOptimizer(initial_learning_rate,
-                                           0.9).minimize(cost)
+  #optimizer = tf.train.AdamOptimizer(initial_learning_rate).minimize(cost)
+  optimizer = tf.train.MomentumOptimizer(initial_learning_rate, 0.9).minimize(cost)
 
   # Option 2: tf.contrib.ctc.ctc_beam_search_decoder
   # (it's slower but you'll get better results)
