@@ -132,7 +132,7 @@ def train():
   test_labels_one_hot = tf.one_hot(test_labels, 2, on_value=1.0, off_value=0.0)
 
   #因为任务比较简单，故意把学习率调小了，以拉长训练过程。
-  learning_rate = 0.0000001
+  learning_rate = 0.000001
   
   
   with tf.variable_scope("inference") as scope:
