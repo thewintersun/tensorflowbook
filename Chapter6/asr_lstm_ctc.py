@@ -26,11 +26,11 @@ num_features = 13
 num_classes = ord('z') - ord('a') + 1 + 1 + 1
 
 # 迭代次数
-num_epochs = 1000
+num_epochs = 200
 # lstm隐藏单元数
 num_hidden = 40
 # 2层lstm网络
-num_layers = 2
+num_layers = 1
 # batch_size设置为1
 batch_size = 1
 # 初始学习率
@@ -219,8 +219,10 @@ def main():
   # 采用计算编辑距离的方式计算，计算decode后结果的错误率。
   ler = tf.reduce_mean(tf.edit_distance(tf.cast(decoded[0], tf.int32),
                                           targets))
+  config = tf.ConfigProto()
+  config.gpu_options.allow_growth = True
 
-  with tf.Session() as session:
+  with tf.Session(config=config) as session:
     # 初始化变量
     tf.global_variables_initializer().run()
 
